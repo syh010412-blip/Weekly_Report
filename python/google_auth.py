@@ -1,20 +1,46 @@
-"""Google Calendar OAuth2 인증 모듈.
-
-처음 실행 시 URL이 출력됩니다. 해당 URL을 브라우저에서 열어
-구글 계정으로 로그인한 후 발급되는 코드를 터미널에 붙여넣으세요.
-이후 token.json에 저장되어 재인증 없이 사용됩니다.
-"""
+"""Google Calendar OAuth2 인증 모듈."""
 import os
+import ssl
 import sys
 
-from google.auth.transport.requests import Request
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+ssl._create_default_https_context = ssl._create_unverified_context
+
+import httplib2
+import google.auth.transport.requests as google_requests
+import requests as req_lib
 from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
+from google_auth_httplib2 import AuthorizedHttp
 from googleapiclient.discovery import build
+from requests.adapters import HTTPAdapter
+from urllib3.util.ssl_ import create_urllib3_context
 
 from config import GOOGLE_CREDENTIALS_PATH, GOOGLE_TOKEN_PATH
 
 SCOPES = ['https://www.googleapis.com/auth/calendar.readonly']
+
+
+class _NoSSLAdapter(HTTPAdapter):
+    def init_poolmanager(self, *args, **kwargs):
+        ctx = create_urllib3_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        kwargs['ssl_context'] = ctx
+        super().init_poolmanager(*args, **kwargs)
+
+
+def _requests_session() -> req_lib.Session:
+    s = req_lib.Session()
+    s.mount('https://', _NoSSLAdapter())
+    s.verify = False
+    return s
+
+
+def _refresh_creds(creds: Credentials) -> Credentials:
+    req = google_requests.Request(session=_requests_session())
+    creds.refresh(req)
+    return creds
 
 
 def get_calendar_service():
@@ -25,26 +51,14 @@ def get_calendar_service():
 
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
+            _refresh_creds(creds)
+            with open(GOOGLE_TOKEN_PATH, 'w') as f:
+                f.write(creds.to_json())
         else:
-            if not os.path.exists(GOOGLE_CREDENTIALS_PATH):
-                print(f'[오류] {GOOGLE_CREDENTIALS_PATH} 파일이 없습니다.')
-                sys.exit(1)
-            flow = InstalledAppFlow.from_client_secrets_file(GOOGLE_CREDENTIALS_PATH, SCOPES)
-            # 로컬 서버 방식: URL 출력 → 브라우저에서 접속 → 자동 토큰 수신
-            print('\n아래 URL을 브라우저에서 열어 구글 계정으로 로그인 후 권한을 허용해주세요.\n')
-            creds = flow.run_local_server(port=0, open_browser=False)
+            print('[오류] 인증이 필요합니다: python3 auth_manual.py url')
+            sys.exit(1)
 
-        with open(GOOGLE_TOKEN_PATH, 'w') as f:
-            f.write(creds.to_json())
-        print(f'[인증] 토큰 저장: {GOOGLE_TOKEN_PATH}')
-
-    return build('calendar', 'v3', credentials=creds)
-
-
-if __name__ == '__main__':
-    svc = get_calendar_service()
-    calendars = svc.calendarList().list().execute()
-    print('연결된 캘린더 목록:')
-    for cal in calendars.get('items', []):
-        print(f'  - {cal["summary"]} ({cal["id"]})')
+    # httplib2로 SSL 검증 비활성화
+    http = httplib2.Http(disable_ssl_certificate_validation=True)
+    authed_http = AuthorizedHttp(creds, http=http)
+    return build('calendar', 'v3', http=authed_http, cache_discovery=False)

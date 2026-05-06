@@ -68,7 +68,12 @@ def get_inbox_for_week(monday: str, sunday: str) -> list[dict]:
         }
         if cursor:
             kwargs['start_cursor'] = cursor
-        res = notion.databases.query(**kwargs)
+        body = {k: v for k, v in kwargs.items() if k != 'database_id'}
+        res = notion.request(
+            path=f'databases/{INBOX_DB_ID}/query',
+            method='POST',
+            body=body,
+        )
         results.extend(res['results'])
         if res.get('has_more'):
             cursor = res['next_cursor']
