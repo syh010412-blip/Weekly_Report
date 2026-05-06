@@ -1,0 +1,16 @@
+{
+  "name": "weekly-review",
+  "version": "1.0.0",
+  "description": "주간 계획(구글캘린더) vs 실행(노션) 비교 분석 리포트",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "auth": "node src/google-auth.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.36.3",
+    "@notionhq/client": "^2.2.15",
+    "dotenv": "^16.4.7",
+    "googleapis": "^144.0.0"
+  }
+}
