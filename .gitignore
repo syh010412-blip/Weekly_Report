@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+
+# 환경 변수 (절대 커밋 금지)
+.env
+python/.env
+
+# Google Calendar 인증 토큰 (절대 커밋 금지)
+token.json
+python/token.json
+credentials.json
+python/credentials.json
+
+# 로그
+*.log
+python/report.log
+
+# 기타
+.DS_Store
+node_modules/
