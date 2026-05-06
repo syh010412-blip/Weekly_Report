@@ -1,6 +1,7 @@
 """Google Calendar OAuth2 인증 모듈.
 
-처음 실행 시 브라우저가 열려 구글 계정 로그인을 요청합니다.
+처음 실행 시 URL이 출력됩니다. 해당 URL을 브라우저에서 열어
+구글 계정으로 로그인한 후 발급되는 코드를 터미널에 붙여넣으세요.
 이후 token.json에 저장되어 재인증 없이 사용됩니다.
 """
 import os
@@ -28,10 +29,11 @@ def get_calendar_service():
         else:
             if not os.path.exists(GOOGLE_CREDENTIALS_PATH):
                 print(f'[오류] {GOOGLE_CREDENTIALS_PATH} 파일이 없습니다.')
-                print('Google Cloud Console에서 OAuth2 credentials.json을 다운로드해 python/ 폴더에 놓으세요.')
                 sys.exit(1)
             flow = InstalledAppFlow.from_client_secrets_file(GOOGLE_CREDENTIALS_PATH, SCOPES)
-            creds = flow.run_local_server(port=0)
+            # 로컬 서버 방식: URL 출력 → 브라우저에서 접속 → 자동 토큰 수신
+            print('\n아래 URL을 브라우저에서 열어 구글 계정으로 로그인 후 권한을 허용해주세요.\n')
+            creds = flow.run_local_server(port=0, open_browser=False)
 
         with open(GOOGLE_TOKEN_PATH, 'w') as f:
             f.write(creds.to_json())
