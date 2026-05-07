@@ -15,7 +15,8 @@ _BASE = 'https://api.notion.com/v1'
 def _req(path: str, method: str = 'GET', body: dict | None = None) -> dict:
     url = f'{_BASE}/{path}'
     resp = requests.request(method, url, headers=_HEADERS, json=body or None, timeout=30)
-    resp.raise_for_status()
+    if not resp.ok:
+        raise requests.HTTPError(f'{resp.status_code} {resp.reason}: {resp.text}', response=resp)
     return resp.json()
 
 
@@ -74,7 +75,7 @@ def upsert_report(title: str, blocks: list[dict], analysis_date: str) -> str:
         'icon': {'type': 'emoji', 'emoji': '📊'},
         'properties': {
             '리포트 명': {'title': [{'text': {'content': title}}]},
-            '분析 날짜': {'date': {'start': analysis_date}},
+            '분석 날짜': {'date': {'start': analysis_date}},
         },
     })
     _append_blocks(page['id'], blocks)
