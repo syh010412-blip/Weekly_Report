@@ -1,21 +1,23 @@
-"""Notion Inbox DB에서 주간 항목을 읽어오는 모듈.
-
-Inbox DB 스키마:
-  Title      (title)        - 캡처한 내용
-  Date       (created_time) - 생성 시각 (자동)
-  메모        (text)         - 상세 메모
-  처리완료    (checkbox)     - 처리 여부
-  출처        (select)       - 머릿속 / 메모 / 메일·메시지 / 기타
-"""
+"""Notion Inbox DB에서 주간 항목을 읽어오는 모듈."""
+import requests
 from datetime import datetime, timezone, timedelta
-
-from notion_client import Client
 
 from config import NOTION_API_KEY, INBOX_DB_ID
 
-notion = Client(auth=NOTION_API_KEY)
-
 KST = timezone(timedelta(hours=9))
+_HEADERS = {
+    'Authorization': f'Bearer {NOTION_API_KEY}',
+    'Notion-Version': '2022-06-28',
+    'Content-Type': 'application/json',
+}
+_BASE = 'https://api.notion.com/v1'
+
+
+def _req(path: str, method: str = 'GET', body: dict | None = None) -> dict:
+    url = f'{_BASE}/{path}'
+    resp = requests.request(method, url, headers=_HEADERS, json=body or None, timeout=30)
+    resp.raise_for_status()
+    return resp.json()
 
 
 def _parse_page(page: dict) -> dict:
@@ -26,7 +28,7 @@ def _parse_page(page: dict) -> dict:
     processed = (props.get('처리완료') or {}).get('checkbox', False)
     source = ((props.get('출처') or {}).get('select') or {}).get('name', '')
 
-    created_at = page.get('created_time', '')  # ISO 8601 UTC
+    created_at = page.get('created_time', '')
     if created_at:
         dt_utc = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
         dt_kst = dt_utc.astimezone(KST)
@@ -55,8 +57,7 @@ def get_inbox_for_week(monday: str, sunday: str) -> list[dict]:
     results = []
     cursor = None
     while True:
-        kwargs: dict = {
-            'database_id': INBOX_DB_ID,
+        body: dict = {
             'filter': {
                 'and': [
                     {'timestamp': 'created_time', 'created_time': {'on_or_after': monday_kst}},
@@ -67,13 +68,8 @@ def get_inbox_for_week(monday: str, sunday: str) -> list[dict]:
             'page_size': 100,
         }
         if cursor:
-            kwargs['start_cursor'] = cursor
-        body = {k: v for k, v in kwargs.items() if k != 'database_id'}
-        res = notion.request(
-            path=f'databases/{INBOX_DB_ID}/query',
-            method='POST',
-            body=body,
-        )
+            body['start_cursor'] = cursor
+        res = _req(f'databases/{INBOX_DB_ID}/query', 'POST', body)
         results.extend(res['results'])
         if res.get('has_more'):
             cursor = res['next_cursor']
