@@ -2,7 +2,7 @@ name: Weekly Analysis Report
 
 on:
   schedule:
-    - cron: '0 12 * * 0'  # 매주 일요일 21:00 KST (= UTC 12:00)
+    - cron: '0 9 * * 0'  # 매주 일요일 18:00 KST (= UTC 09:00)
   workflow_dispatch:       # 수동 실행 가능
 
 permissions:
