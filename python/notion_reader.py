@@ -20,6 +20,22 @@ def _req(path: str, method: str = 'GET', body: dict | None = None) -> dict:
     return resp.json()
 
 
+def _get_page_body(page_id: str) -> str:
+    """페이지 본문 블록에서 텍스트 추출."""
+    try:
+        res = _req(f'blocks/{page_id}/children?page_size=100')
+        lines = []
+        for block in res.get('results', []):
+            block_type = block.get('type', '')
+            rich_texts = block.get(block_type, {}).get('rich_text', [])
+            text = ''.join(t.get('plain_text', '') for t in rich_texts)
+            if text.strip():
+                lines.append(text.strip())
+        return '\n'.join(lines)
+    except Exception:
+        return ''
+
+
 def _parse_page(page: dict) -> dict:
     props = page['properties']
 
@@ -77,6 +93,8 @@ def get_inbox_for_week(monday: str, sunday: str) -> list[dict]:
             break
 
     items = [_parse_page(p) for p in results]
+    for item in items:
+        item['body'] = _get_page_body(item['page_id'])
     print(f'[Inbox] {len(items)}건 ({monday} ~ {sunday})')
     return items
 

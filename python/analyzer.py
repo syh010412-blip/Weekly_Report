@@ -34,8 +34,9 @@ def _build_prompt(week: dict, cal_by_date: dict, inbox_items: list[dict], inbox_
     for item in inbox_items:
         proc = '✅ 처리완료' if item['processed'] else '⏳ 미처리'
         memo_str = f' / 메모: {item["memo"]}' if item['memo'] else ''
+        body_str = f' / 본문: {item["body"]}' if item.get('body') else ''
         inbox_lines.append(
-            f'  {item["date"]} {item["time"]} | {item["title"]}{memo_str} | {proc} | 출처: {item["source"] or "기타"}'
+            f'  {item["date"]} {item["time"]} | {item["title"]}{memo_str}{body_str} | {proc} | 출처: {item["source"] or "기타"}'
         )
     inbox_section = '\n'.join(inbox_lines) if inbox_lines else '  (항목 없음)'
 
