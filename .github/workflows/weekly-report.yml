@@ -25,7 +25,15 @@ jobs:
         run: pip install -r requirements.txt
 
       - name: Write Google token
-        run: echo "${{ secrets.GOOGLE_TOKEN_B64 }}" | base64 -d > token.json
+        run: printf '%s' "${{ secrets.GOOGLE_TOKEN_B64 }}" | base64 -d > token.json
+
+      - name: Verify token file
+        run: |
+          if [ ! -s token.json ]; then
+            echo "ERROR: token.json is empty - check GOOGLE_TOKEN_B64 secret"
+            exit 1
+          fi
+          echo "token.json OK ($(wc -c < token.json) bytes)"
 
       - name: Run weekly report
         env:
