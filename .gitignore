@@ -25,3 +25,4 @@ python/report.log
 # 기타
 .DS_Store
 node_modules/
+.claude/settings.local.json
