@@ -117,6 +117,55 @@ def toggle_heading2(text: str, children: list[dict]) -> dict:
     }
 
 
+# ── 재활 섹션 빌더 ──────────────────────────────────────────────
+
+def build_rehab_section(rehab_items: list[dict], rehab_summary: dict) -> list[dict]:
+    blocks: list[dict] = []
+    blocks.append(heading1('🏥 재활 기록'))
+
+    total = rehab_summary.get('total', 0)
+    if total == 0:
+        blocks.append(paragraph([rt('이번 주 재활 기록 없음.', color='gray')]))
+        return blocks
+
+    avg_pain = rehab_summary.get('avg_pain')
+    avg_arm = rehab_summary.get('avg_arm_mobility')
+    summary_rows = [
+        ['기록 일수', f'{total}일'],
+        ['평균 통증', f'{avg_pain}/10' if avg_pain is not None else '-'],
+        ['평균 왼팔 움직임', f'{avg_arm}/10' if avg_arm is not None else '-'],
+    ]
+
+    cond_counts = rehab_summary.get('condition_counts', {})
+    if cond_counts:
+        summary_rows.append(['컨디션 분포', ' / '.join(f'{k} {v}일' for k, v in cond_counts.items())])
+
+    mood_counts = rehab_summary.get('mood_counts', {})
+    if mood_counts:
+        summary_rows.append(['기분 분포', ' / '.join(f'{k} {v}일' for k, v in mood_counts.items())])
+
+    blocks.append(table(['항목', '내용'], summary_rows))
+
+    detail_rows = [
+        [
+            item['date'],
+            item['condition'] or '-',
+            f'{item["pain"]}/10' if item['pain'] is not None else '-',
+            f'{item["arm_mobility"]}/10' if item['arm_mobility'] is not None else '-',
+            item['mood'] or '-',
+            item['exercises'][:50] + ('…' if len(item['exercises']) > 50 else '') if item['exercises'] else '-',
+            item['memo'][:60] + ('…' if len(item['memo']) > 60 else '') if item['memo'] else '-',
+        ]
+        for item in rehab_items
+    ]
+    blocks.append(toggle_heading2(
+        f'📋 재활 일별 상세 ({total}건)',
+        [table(['날짜', '컨디션', '통증', '왼팔', '기분', '오늘 한 운동', '메모'], detail_rows)],
+    ))
+
+    return blocks
+
+
 # ── 메인 리포트 빌더 ─────────────────────────────────────────────
 
 def build_report_blocks(
@@ -125,6 +174,8 @@ def build_report_blocks(
     inbox_items: list[dict],
     inbox_summary: dict,
     analysis: dict,
+    rehab_items: list[dict] | None = None,
+    rehab_summary: dict | None = None,
 ) -> list[dict]:
     monday, sunday = week['monday'], week['sunday']
     blocks: list[dict] = []
@@ -284,7 +335,11 @@ def build_report_blocks(
     for i, sug in enumerate(suggestions, 1):
         blocks.append(numbered(sug))
 
-    blocks.append(divider())
+    # ── 재활 기록 ─────────────────────────────────────────────────
+    if rehab_items is not None and rehab_summary is not None:
+        blocks.extend(build_rehab_section(rehab_items, rehab_summary))
+        blocks.append(divider())
+
     blocks.append(callout('Claude AI가 분석한 주간 리포트입니다.', '🤖', 'gray_background'))
 
     return blocks
