@@ -8,6 +8,7 @@ load_dotenv()
 NOTION_API_KEY = os.getenv('NOTION_API_KEY', '')
 INBOX_DB_ID = os.getenv('NOTION_INBOX_DB_ID') or '81c6e06c-3979-4922-a591-58dd1cd46b34'
 REPORT_DB_ID = os.getenv('NOTION_REPORT_DB_ID') or '34da3bd9-3958-8007-82ee-efb717e2658f'
+REHAB_DB_ID = os.getenv('NOTION_REHAB_DB_ID') or 'e6462d82-a461-419f-bd95-db0207ea7198'
 
 # Anthropic
 ANTHROPIC_API_KEY = os.getenv('ANTHROPIC_API_KEY', '')

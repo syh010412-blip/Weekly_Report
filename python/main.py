@@ -54,6 +54,18 @@ def main() -> None:
         log(f'[오류] Notion Inbox 수집 실패: {err}')
         sys.exit(1)
 
+    # 3.5. 재활 기록 수집
+    log('재활 기록 수집 중...')
+    try:
+        from rehab_reader import get_rehab_for_week, summarize_rehab
+        rehab_items = get_rehab_for_week(week['monday'], week['sunday'])
+        rehab_summary = summarize_rehab(rehab_items)
+        log(f'재활 기록: {rehab_summary["total"]}건')
+    except Exception as err:
+        log(f'[경고] 재활 기록 수집 실패 (계속 진행): {err}')
+        rehab_items = []
+        rehab_summary = {'total': 0, 'avg_pain': None, 'avg_arm_mobility': None, 'condition_counts': {}, 'mood_counts': {}}
+
     # 4. Claude AI 분석
     log('Claude AI 분석 중...')
     try:
@@ -66,7 +78,7 @@ def main() -> None:
     # 5. Notion 블록 생성
     log('Notion 블록 빌드 중...')
     from blocks import build_report_blocks
-    blocks = build_report_blocks(week, cal_by_date, inbox_items, inbox_summary, analysis)
+    blocks = build_report_blocks(week, cal_by_date, inbox_items, inbox_summary, analysis, rehab_items, rehab_summary)
     log(f'블록 {len(blocks)}개 생성')
 
     # 6. Notion 업로드
