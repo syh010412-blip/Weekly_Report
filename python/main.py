@@ -66,6 +66,18 @@ def main() -> None:
         rehab_items = []
         rehab_summary = {'total': 0, 'avg_pain': None, 'avg_arm_mobility': None, 'condition_counts': {}, 'mood_counts': {}}
 
+    # 3.6. 일기 기록 수집
+    log('일기 기록 수집 중...')
+    try:
+        from diary_reader import get_diary_for_week, summarize_diary
+        diary_items = get_diary_for_week(week['monday'], week['sunday'])
+        diary_summary = summarize_diary(diary_items)
+        log(f'일기 기록: {diary_summary["total"]}건')
+    except Exception as err:
+        log(f'[경고] 일기 기록 수집 실패 (계속 진행): {err}')
+        diary_items = []
+        diary_summary = {'total': 0, 'mood_counts': {}}
+
     # 4. Claude AI 분석
     log('Claude AI 분석 중...')
     try:
@@ -78,7 +90,10 @@ def main() -> None:
     # 5. Notion 블록 생성
     log('Notion 블록 빌드 중...')
     from blocks import build_report_blocks
-    blocks = build_report_blocks(week, cal_by_date, inbox_items, inbox_summary, analysis, rehab_items, rehab_summary)
+    blocks = build_report_blocks(
+        week, cal_by_date, inbox_items, inbox_summary, analysis,
+        rehab_items, rehab_summary, diary_items, diary_summary,
+    )
     log(f'블록 {len(blocks)}개 생성')
 
     # 6. Notion 업로드
