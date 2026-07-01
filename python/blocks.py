@@ -166,6 +166,37 @@ def build_rehab_section(rehab_items: list[dict], rehab_summary: dict) -> list[di
     return blocks
 
 
+# ── 일기 섹션 빌더 ──────────────────────────────────────────────
+
+def build_diary_section(diary_items: list[dict], diary_summary: dict) -> list[dict]:
+    blocks: list[dict] = []
+    blocks.append(heading1('📔 일기'))
+
+    total = diary_summary.get('total', 0)
+    if total == 0:
+        blocks.append(paragraph([rt('이번 주 일기 기록 없음.', color='gray')]))
+        return blocks
+
+    summary_rows = [['작성 일수', f'{total}일']]
+    mood_counts = diary_summary.get('mood_counts', {})
+    if mood_counts:
+        summary_rows.append(['기분/태그 분포', ' / '.join(f'{k} {v}일' for k, v in mood_counts.items())])
+    blocks.append(table(['항목', '내용'], summary_rows))
+
+    diary_children: list[dict] = []
+    for item in diary_items:
+        title = item['title'] or '(제목 없음)'
+        mood_str = f" · {item['mood']}" if item.get('mood') else ''
+        content = item.get('content') or '(본문 없음)'
+        entry_children = [paragraph([rt(line)]) for line in content.split('\n') if line.strip()]
+        if not entry_children:
+            entry_children = [paragraph([rt('(본문 없음)', color='gray')])]
+        diary_children.append(toggle_heading2(f'{item["date"]} {title}{mood_str}', entry_children))
+    blocks.append(toggle_heading2(f'📋 일기 전체 목록 ({total}건)', diary_children))
+
+    return blocks
+
+
 # ── 메인 리포트 빌더 ─────────────────────────────────────────────
 
 def build_report_blocks(
@@ -176,6 +207,8 @@ def build_report_blocks(
     analysis: dict,
     rehab_items: list[dict] | None = None,
     rehab_summary: dict | None = None,
+    diary_items: list[dict] | None = None,
+    diary_summary: dict | None = None,
 ) -> list[dict]:
     monday, sunday = week['monday'], week['sunday']
     blocks: list[dict] = []
@@ -338,6 +371,11 @@ def build_report_blocks(
     # ── 재활 기록 ─────────────────────────────────────────────────
     if rehab_items is not None and rehab_summary is not None:
         blocks.extend(build_rehab_section(rehab_items, rehab_summary))
+        blocks.append(divider())
+
+    # ── 일기 ─────────────────────────────────────────────────────
+    if diary_items is not None and diary_summary is not None:
+        blocks.extend(build_diary_section(diary_items, diary_summary))
         blocks.append(divider())
 
     blocks.append(callout('Claude AI가 분석한 주간 리포트입니다.', '🤖', 'gray_background'))

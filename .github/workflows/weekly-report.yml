@@ -45,5 +45,6 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           NOTION_INBOX_DB_ID: ${{ secrets.NOTION_INBOX_DB_ID }}
           NOTION_REPORT_DB_ID: ${{ secrets.NOTION_REPORT_DB_ID }}
+          NOTION_DIARY_DB_ID: ${{ secrets.NOTION_DIARY_DB_ID }}
           REPORT_DATE: ${{ github.event.inputs.report_date }}
         run: python3 main.py
