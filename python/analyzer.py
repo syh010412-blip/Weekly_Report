@@ -128,3 +128,90 @@ def analyze(week: dict, cal_by_date: dict, inbox_items: list[dict], inbox_summar
 
     print('[AI 분석] 완료')
     return result
+
+
+DIARY_SYSTEM_PROMPT = """당신은 다정한 1인칭 회고 작가입니다.
+사용자의 재활 기록, Notion Inbox 캡처, 캘린더 활동만을 근거로
+일기 스타일의 주간 회고를 작성합니다.
+주어진 데이터에 없는 사실을 지어내지 마세요.
+반드시 유효한 JSON만 출력하세요. 마크다운 코드블록 없이. 한국어로 응답하세요.
+"""
+
+
+def _build_diary_prompt(week: dict, rehab_items: list[dict], inbox_items: list[dict], cal_by_date: dict) -> str:
+    monday, sunday = week['monday'], week['sunday']
+
+    rehab_lines = []
+    for item in rehab_items:
+        rehab_lines.append(
+            f'  {item["date"]} | 컨디션: {item["condition"] or "-"} | 통증: {item["pain"]}/10 | '
+            f'왼팔: {item["arm_mobility"]}/10 | 기분: {item["mood"] or "-"} | 메모: {item["memo"] or "-"}'
+        )
+    rehab_section = '\n'.join(rehab_lines) if rehab_lines else '  (기록 없음)'
+
+    inbox_lines = []
+    for item in inbox_items:
+        body_str = f' / 본문: {item["body"]}' if item.get('body') else ''
+        inbox_lines.append(f'  {item["date"]} {item["time"]} | {item["title"]}{body_str}')
+    inbox_section = '\n'.join(inbox_lines) if inbox_lines else '  (항목 없음)'
+
+    cal_lines = []
+    for d in week['dates']:
+        events = cal_by_date.get(d, [])
+        titles = ', '.join(sorted({ev['title'] for ev in events})) if events else '(일정 없음)'
+        cal_lines.append(f'  {d}: {titles}')
+    cal_section = '\n'.join(cal_lines)
+
+    return f"""아래 데이터를 바탕으로 {monday}~{sunday} 주간 회고 일기를 작성하세요.
+Notion 일기 DB에 실제 기록이 없어서, 재활 기록·Inbox 캡처·캘린더 활동으로 대신 회고를 구성합니다.
+
+## 재활 기록
+{rehab_section}
+
+## Inbox 캡처 (생각/감정 기록)
+{inbox_section}
+
+## 캘린더 활동 요약
+{cal_section}
+
+## 작성 지침
+- 날짜별로 1인칭 일기 문체로 2~3문장씩 작성하세요 (실제 기록이 있는 날짜만).
+- 재활 기록의 통증/왼팔 움직임 변화, Inbox의 감정/생각 캡처를 자연스럽게 녹여내세요.
+- 데이터에 없는 사건이나 감정을 지어내지 마세요.
+- 마지막에 주간 총평을 2~3문장으로 작성하세요.
+
+## 출력 JSON 형식
+{{
+  "entries": [
+    {{"date": "YYYY-MM-DD", "day_name": "월", "text": "일기 본문 2~3문장", "mood": "기록에 있으면 이모지+감정, 없으면 빈 문자열"}}
+  ],
+  "weekly_summary": "주간 총평 2~3문장"
+}}"""
+
+
+def generate_diary_reflection(
+    week: dict, rehab_items: list[dict], inbox_items: list[dict], cal_by_date: dict
+) -> dict | None:
+    """일기 DB 기록이 없을 때, 재활/Inbox/캘린더 데이터로 회고를 대신 생성."""
+    if not rehab_items and not inbox_items:
+        return None
+
+    print('[일기 생성] 재활/Inbox 데이터로 회고 생성 중...')
+    prompt = _build_diary_prompt(week, rehab_items, inbox_items, cal_by_date)
+
+    message = client.messages.create(
+        model='claude-sonnet-4-6',
+        max_tokens=3000,
+        system=DIARY_SYSTEM_PROMPT,
+        messages=[{'role': 'user', 'content': prompt}],
+    )
+
+    raw = message.content[0].text.strip()
+    raw = raw.removeprefix('```json').removeprefix('```').removesuffix('```').strip()
+    s, e = raw.find('{'), raw.rfind('}')
+    if s != -1 and e != -1:
+        raw = raw[s:e + 1]
+
+    result = json.loads(raw)
+    print('[일기 생성] 완료')
+    return result
