@@ -40,7 +40,11 @@ def main() -> None:
         log(f'구글 캘린더: {total_cal}건')
     except Exception as err:
         log(f'[오류] 구글 캘린더 수집 실패: {err}')
-        log('credentials.json이 python/ 폴더에 있는지 확인하고, python google_auth.py로 인증하세요.')
+        if os.environ.get('GITHUB_ACTIONS') == 'true':
+            log('Workload Identity Federation 인증 실패로 보입니다. GCP IAM에서 서비스 계정에 '
+                'roles/iam.workloadIdentityUser 권한이 부여되어 있는지 확인하세요.')
+        else:
+            log('credentials.json이 python/ 폴더에 있는지 확인하고, python auth_manual.py로 인증하세요.')
         sys.exit(1)
 
     # 3. Notion Inbox 데이터 수집
