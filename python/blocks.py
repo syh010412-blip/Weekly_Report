@@ -168,13 +168,33 @@ def build_rehab_section(rehab_items: list[dict], rehab_summary: dict) -> list[di
 
 # ── 일기 섹션 빌더 ──────────────────────────────────────────────
 
-def build_diary_section(diary_items: list[dict], diary_summary: dict) -> list[dict]:
+def build_diary_section(
+    diary_items: list[dict], diary_summary: dict, generated: dict | None = None
+) -> list[dict]:
     blocks: list[dict] = []
     blocks.append(heading1('📔 일기'))
 
     total = diary_summary.get('total', 0)
     if total == 0:
-        blocks.append(paragraph([rt('이번 주 일기 기록 없음.', color='gray')]))
+        if generated and generated.get('entries'):
+            blocks.append(callout(
+                'Notion 일기 기록이 없어 캘린더·재활·Inbox 데이터를 바탕으로 AI가 정리한 회고입니다.',
+                '📝', 'gray_background',
+            ))
+            for entry in generated['entries']:
+                label = f"{entry.get('date', '')} {entry.get('day_name', '')}".strip()
+                mood = entry.get('mood', '')
+                text = entry.get('text', '')
+                if mood:
+                    text = f'{text} 기분: {mood}'
+                blocks.append(paragraph([rt(f'{label} — ', bold=True), rt(text)]))
+            if generated.get('weekly_summary'):
+                blocks.append(callout(
+                    [rt('이번 주 총평\n', bold=True), rt(generated['weekly_summary'])],
+                    '💬', 'gray_background',
+                ))
+        else:
+            blocks.append(paragraph([rt('이번 주 일기 기록 없음.', color='gray')]))
         return blocks
 
     summary_rows = [['작성 일수', f'{total}일']]
@@ -209,6 +229,7 @@ def build_report_blocks(
     rehab_summary: dict | None = None,
     diary_items: list[dict] | None = None,
     diary_summary: dict | None = None,
+    generated_diary: dict | None = None,
 ) -> list[dict]:
     monday, sunday = week['monday'], week['sunday']
     blocks: list[dict] = []
@@ -375,7 +396,7 @@ def build_report_blocks(
 
     # ── 일기 ─────────────────────────────────────────────────────
     if diary_items is not None and diary_summary is not None:
-        blocks.extend(build_diary_section(diary_items, diary_summary))
+        blocks.extend(build_diary_section(diary_items, diary_summary, generated_diary))
         blocks.append(divider())
 
     blocks.append(callout('Claude AI가 분석한 주간 리포트입니다.', '🤖', 'gray_background'))
