@@ -169,7 +169,8 @@ def build_rehab_section(rehab_items: list[dict], rehab_summary: dict) -> list[di
 # ── 일기 섹션 빌더 ──────────────────────────────────────────────
 
 def build_diary_section(
-    diary_items: list[dict], diary_summary: dict, generated: dict | None = None
+    diary_items: list[dict], diary_summary: dict, generated: dict | None = None,
+    entry_summary: dict | None = None,
 ) -> list[dict]:
     blocks: list[dict] = []
     blocks.append(heading1('📔 일기'))
@@ -203,6 +204,17 @@ def build_diary_section(
         summary_rows.append(['기분/태그 분포', ' / '.join(f'{k} {v}일' for k, v in mood_counts.items())])
     blocks.append(table(['항목', '내용'], summary_rows))
 
+    if entry_summary and entry_summary.get('entries'):
+        blocks.append(heading2('💛 이번 주 감정 · 사건 요약'))
+        for entry in entry_summary['entries']:
+            label = f"{entry.get('date', '')} {entry.get('day_name', '')}".strip()
+            blocks.append(paragraph([rt(f'{label} — ', bold=True), rt(entry.get('text', ''))]))
+        if entry_summary.get('weekly_summary'):
+            blocks.append(callout(
+                [rt('종합\n', bold=True), rt(entry_summary['weekly_summary'])],
+                '💬', 'pink_background',
+            ))
+
     diary_children: list[dict] = []
     for item in diary_items:
         title = item['title'] or '(제목 없음)'
@@ -230,6 +242,7 @@ def build_report_blocks(
     diary_items: list[dict] | None = None,
     diary_summary: dict | None = None,
     generated_diary: dict | None = None,
+    diary_entry_summary: dict | None = None,
 ) -> list[dict]:
     monday, sunday = week['monday'], week['sunday']
     blocks: list[dict] = []
@@ -396,7 +409,7 @@ def build_report_blocks(
 
     # ── 일기 ─────────────────────────────────────────────────────
     if diary_items is not None and diary_summary is not None:
-        blocks.extend(build_diary_section(diary_items, diary_summary, generated_diary))
+        blocks.extend(build_diary_section(diary_items, diary_summary, generated_diary, diary_entry_summary))
         blocks.append(divider())
 
     blocks.append(callout('Claude AI가 분석한 주간 리포트입니다.', '🤖', 'gray_background'))
