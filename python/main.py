@@ -93,19 +93,27 @@ def main() -> None:
 
     # 4.5. 일기 기록이 없으면 재활/Inbox/캘린더 데이터로 회고 대신 생성
     generated_diary = None
+    diary_entry_summary = None
     if diary_summary['total'] == 0:
         try:
             from analyzer import generate_diary_reflection
             generated_diary = generate_diary_reflection(week, rehab_items, inbox_items, cal_by_date)
         except Exception as err:
             log(f'[경고] 일기 자동 생성 실패 (계속 진행): {err}')
+    else:
+        try:
+            from analyzer import summarize_diary_entries
+            diary_entry_summary = summarize_diary_entries(diary_items)
+        except Exception as err:
+            log(f'[경고] 일기 감정/사건 요약 실패 (계속 진행): {err}')
 
     # 5. Notion 블록 생성
     log('Notion 블록 빌드 중...')
     from blocks import build_report_blocks
     blocks = build_report_blocks(
         week, cal_by_date, inbox_items, inbox_summary, analysis,
-        rehab_items, rehab_summary, diary_items, diary_summary, generated_diary,
+        rehab_items, rehab_summary, diary_items, diary_summary,
+        generated_diary, diary_entry_summary,
     )
     log(f'블록 {len(blocks)}개 생성')
 
