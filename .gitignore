@@ -17,6 +17,7 @@ token.json
 python/token.json
 credentials.json
 python/credentials.json
+client_secret*.json
 
 # 로그
 *.log
