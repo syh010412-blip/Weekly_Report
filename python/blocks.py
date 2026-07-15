@@ -217,6 +217,36 @@ def build_diary_section(
     return blocks
 
 
+# ── 건강 섹션 빌더 ──────────────────────────────────────────────
+
+def build_health_section(health_items: list[dict], health_summary: dict) -> list[dict]:
+    blocks: list[dict] = []
+    blocks.append(heading1('🏃 건강 기록'))
+
+    total = health_summary.get('total', 0)
+    if total == 0:
+        blocks.append(paragraph([rt('이번 주 건강 기록 없음 (iOS 단축어 자동화 연동 필요).', color='gray')]))
+        return blocks
+
+    metrics = health_summary.get('metrics', {})
+    summary_rows = [['기록 일수', f'{total}일']]
+    for name, stat in metrics.items():
+        summary_rows.append([name, f"평균 {stat['avg']} / 합계 {stat['sum']} ({stat['days']}일 기록)"])
+    blocks.append(table(['항목', '내용'], summary_rows))
+
+    metric_names = list(metrics.keys())
+    detail_rows = [
+        [item['date'], *[str(item['metrics'].get(name, '-')) for name in metric_names]]
+        for item in health_items
+    ]
+    blocks.append(toggle_heading2(
+        f'📋 건강 일별 상세 ({total}건)',
+        [table(['날짜', *metric_names], detail_rows)],
+    ))
+
+    return blocks
+
+
 # ── 메인 리포트 빌더 ─────────────────────────────────────────────
 
 def build_report_blocks(
@@ -230,6 +260,8 @@ def build_report_blocks(
     diary_items: list[dict] | None = None,
     diary_summary: dict | None = None,
     generated_diary: dict | None = None,
+    health_items: list[dict] | None = None,
+    health_summary: dict | None = None,
 ) -> list[dict]:
     monday, sunday = week['monday'], week['sunday']
     blocks: list[dict] = []
@@ -397,6 +429,11 @@ def build_report_blocks(
     # ── 일기 ─────────────────────────────────────────────────────
     if diary_items is not None and diary_summary is not None:
         blocks.extend(build_diary_section(diary_items, diary_summary, generated_diary))
+        blocks.append(divider())
+
+    # ── 건강 기록 ─────────────────────────────────────────────────
+    if health_items is not None and health_summary is not None:
+        blocks.extend(build_health_section(health_items, health_summary))
         blocks.append(divider())
 
     blocks.append(callout('Claude AI가 분석한 주간 리포트입니다.', '🤖', 'gray_background'))

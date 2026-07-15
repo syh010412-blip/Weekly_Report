@@ -82,6 +82,18 @@ def main() -> None:
         diary_items = []
         diary_summary = {'total': 0, 'mood_counts': {}}
 
+    # 3.7. 건강 기록 수집 (iOS 단축어 자동화 → Notion)
+    log('건강 기록 수집 중...')
+    try:
+        from health_reader import get_health_for_week, summarize_health
+        health_items = get_health_for_week(week['monday'], week['sunday'])
+        health_summary = summarize_health(health_items)
+        log(f'건강 기록: {health_summary["total"]}건')
+    except Exception as err:
+        log(f'[경고] 건강 기록 수집 실패 (계속 진행): {err}')
+        health_items = []
+        health_summary = {'total': 0, 'metrics': {}}
+
     # 4. Claude AI 분석
     log('Claude AI 분석 중...')
     try:
@@ -106,6 +118,7 @@ def main() -> None:
     blocks = build_report_blocks(
         week, cal_by_date, inbox_items, inbox_summary, analysis,
         rehab_items, rehab_summary, diary_items, diary_summary, generated_diary,
+        health_items, health_summary,
     )
     log(f'블록 {len(blocks)}개 생성')
 
