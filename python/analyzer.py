@@ -103,30 +103,114 @@ def _build_prompt(week: dict, cal_by_date: dict, inbox_items: list[dict], inbox_
 }}"""
 
 
+ANALYSIS_TOOL = {
+    'name': 'submit_weekly_analysis',
+    'description': '주간 계획 vs 실행 분석 결과를 제출합니다.',
+    'input_schema': {
+        'type': 'object',
+        'properties': {
+            'weekly_overview': {'type': 'string'},
+            'plan_vs_execution': {
+                'type': 'object',
+                'properties': {
+                    'executed_as_planned': {
+                        'type': 'array',
+                        'items': {
+                            'type': 'object',
+                            'properties': {
+                                'calendar_event': {'type': 'string'},
+                                'inbox_item': {'type': 'string'},
+                                'date': {'type': 'string'},
+                                'note': {'type': 'string'},
+                            },
+                            'required': ['calendar_event', 'inbox_item', 'date', 'note'],
+                        },
+                    },
+                    'unplanned_captures': {
+                        'type': 'array',
+                        'items': {
+                            'type': 'object',
+                            'properties': {
+                                'inbox_item': {'type': 'string'},
+                                'date': {'type': 'string'},
+                                'processed': {'type': 'boolean'},
+                                'insight': {'type': 'string'},
+                            },
+                            'required': ['inbox_item', 'date', 'processed', 'insight'],
+                        },
+                    },
+                    'planned_not_captured': {
+                        'type': 'array',
+                        'items': {
+                            'type': 'object',
+                            'properties': {
+                                'calendar_event': {'type': 'string'},
+                                'date': {'type': 'string'},
+                                'reason': {'type': 'string'},
+                            },
+                            'required': ['calendar_event', 'date', 'reason'],
+                        },
+                    },
+                },
+                'required': ['executed_as_planned', 'unplanned_captures', 'planned_not_captured'],
+            },
+            'metrics': {
+                'type': 'object',
+                'properties': {
+                    'total_calendar_events': {'type': 'integer'},
+                    'total_inbox_items': {'type': 'integer'},
+                    'inbox_process_rate': {'type': 'number'},
+                    'calendar_capture_rate': {'type': 'number'},
+                    'capture_rate_note': {'type': 'string'},
+                },
+                'required': [
+                    'total_calendar_events', 'total_inbox_items', 'inbox_process_rate',
+                    'calendar_capture_rate', 'capture_rate_note',
+                ],
+            },
+            'insights': {'type': 'array', 'items': {'type': 'string'}},
+            'patterns': {
+                'type': 'object',
+                'properties': {
+                    'strong_points': {'type': 'string'},
+                    'weak_points': {'type': 'string'},
+                    'inbox_health': {'type': 'string'},
+                },
+                'required': ['strong_points', 'weak_points', 'inbox_health'],
+            },
+            'next_week_suggestions': {'type': 'array', 'items': {'type': 'string'}},
+        },
+        'required': [
+            'weekly_overview', 'plan_vs_execution', 'metrics', 'insights',
+            'patterns', 'next_week_suggestions',
+        ],
+    },
+}
+
+
+def _extract_tool_input(message, tool_name: str) -> dict:
+    for block in message.content:
+        if block.type == 'tool_use' and block.name == tool_name:
+            return block.input
+    raise ValueError(f'[{tool_name}] 응답에 tool_use 블록이 없습니다: {message.content}')
+
+
 def analyze(week: dict, cal_by_date: dict, inbox_items: list[dict], inbox_summary: dict) -> dict:
     print('[AI 분석] Claude에 분석 요청 중...')
     prompt = _build_prompt(week, cal_by_date, inbox_items, inbox_summary)
 
+    # tool-use로 강제해 스키마에 맞는 유효한 JSON만 받도록 함 (raw 텍스트 파싱 시
+    # 문자열 안 이스케이프 안 된 개행/따옴표 때문에 파싱이 깨지던 문제를 원천 차단).
     message = client.messages.create(
         model='claude-sonnet-4-6',
         max_tokens=8000,
         system=SYSTEM_PROMPT,
         messages=[{'role': 'user', 'content': prompt}],
+        tools=[ANALYSIS_TOOL],
+        tool_choice={'type': 'tool', 'name': ANALYSIS_TOOL['name']},
     )
 
-    raw = message.content[0].text.strip()
-    raw = raw.removeprefix('```json').removeprefix('```').removesuffix('```').strip()
-    s, e = raw.find('{'), raw.rfind('}')
-    if s != -1 and e != -1:
-        raw = raw[s:e + 1]
-
-    try:
-        result = json.loads(raw)
-    except json.JSONDecodeError as exc:
-        print(f'[AI 분석] JSON 파싱 실패 ({exc}), 원본 앞 500자:\n{raw[:500]}')
-        # Claude가 문자열 값 안에 이스케이프 안 된 개행 등 제어문자를 그대로 출력하는 경우가 있어 완화 모드로 재시도
-        result = json.loads(raw.replace('\x00', ''), strict=False)
-
+    result = _extract_tool_input(message, ANALYSIS_TOOL['name'])
     print('[AI 분석] 완료')
     return result
 
@@ -190,6 +274,32 @@ Notion 일기 DB에 실제 기록이 없어서, 재활 기록·Inbox 캡처·캘
 }}"""
 
 
+DIARY_TOOL = {
+    'name': 'submit_diary_reflection',
+    'description': '주간 회고 일기를 제출합니다.',
+    'input_schema': {
+        'type': 'object',
+        'properties': {
+            'entries': {
+                'type': 'array',
+                'items': {
+                    'type': 'object',
+                    'properties': {
+                        'date': {'type': 'string'},
+                        'day_name': {'type': 'string'},
+                        'text': {'type': 'string'},
+                        'mood': {'type': 'string'},
+                    },
+                    'required': ['date', 'day_name', 'text', 'mood'],
+                },
+            },
+            'weekly_summary': {'type': 'string'},
+        },
+        'required': ['entries', 'weekly_summary'],
+    },
+}
+
+
 def generate_diary_reflection(
     week: dict, rehab_items: list[dict], inbox_items: list[dict], cal_by_date: dict
 ) -> dict | None:
@@ -205,19 +315,10 @@ def generate_diary_reflection(
         max_tokens=3000,
         system=DIARY_SYSTEM_PROMPT,
         messages=[{'role': 'user', 'content': prompt}],
+        tools=[DIARY_TOOL],
+        tool_choice={'type': 'tool', 'name': DIARY_TOOL['name']},
     )
 
-    raw = message.content[0].text.strip()
-    raw = raw.removeprefix('```json').removeprefix('```').removesuffix('```').strip()
-    s, e = raw.find('{'), raw.rfind('}')
-    if s != -1 and e != -1:
-        raw = raw[s:e + 1]
-
-    try:
-        result = json.loads(raw)
-    except json.JSONDecodeError as exc:
-        print(f'[일기 생성] JSON 파싱 실패 ({exc}), 완화 모드로 재시도')
-        result = json.loads(raw.replace('\x00', ''), strict=False)
-
+    result = _extract_tool_input(message, DIARY_TOOL['name'])
     print('[일기 생성] 완료')
     return result
