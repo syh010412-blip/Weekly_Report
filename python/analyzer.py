@@ -124,7 +124,8 @@ def analyze(week: dict, cal_by_date: dict, inbox_items: list[dict], inbox_summar
         result = json.loads(raw)
     except json.JSONDecodeError as exc:
         print(f'[AI 분석] JSON 파싱 실패 ({exc}), 원본 앞 500자:\n{raw[:500]}')
-        result = json.loads(raw.replace('\x00', '').replace('\r', ''))
+        # Claude가 문자열 값 안에 이스케이프 안 된 개행 등 제어문자를 그대로 출력하는 경우가 있어 완화 모드로 재시도
+        result = json.loads(raw.replace('\x00', ''), strict=False)
 
     print('[AI 분석] 완료')
     return result
@@ -212,6 +213,11 @@ def generate_diary_reflection(
     if s != -1 and e != -1:
         raw = raw[s:e + 1]
 
-    result = json.loads(raw)
+    try:
+        result = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        print(f'[일기 생성] JSON 파싱 실패 ({exc}), 완화 모드로 재시도')
+        result = json.loads(raw.replace('\x00', ''), strict=False)
+
     print('[일기 생성] 완료')
     return result
