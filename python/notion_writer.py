@@ -20,8 +20,8 @@ def _req(path: str, method: str = 'GET', body: dict | None = None) -> dict:
     return resp.json()
 
 
-def _find_existing(title: str) -> str | None:
-    res = _req(f'databases/{REPORT_DB_ID}/query', 'POST', {
+def _find_existing(title: str, db_id: str = REPORT_DB_ID) -> str | None:
+    res = _req(f'databases/{db_id}/query', 'POST', {
         'filter': {'property': '리포트 명', 'title': {'equals': title}},
         'page_size': 1,
     })
@@ -58,8 +58,8 @@ def _append_blocks(page_id: str, blocks: list[dict]) -> None:
         print(f'[Notion] 블록 업로드: {done}/{len(blocks)}')
 
 
-def upsert_report(title: str, blocks: list[dict], analysis_date: str) -> str:
-    existing_id = _find_existing(title)
+def upsert_report(title: str, blocks: list[dict], analysis_date: str, db_id: str = REPORT_DB_ID) -> str:
+    existing_id = _find_existing(title, db_id)
 
     if existing_id:
         print(f'[Notion] 기존 페이지 업데이트: "{title}"')
@@ -71,7 +71,7 @@ def upsert_report(title: str, blocks: list[dict], analysis_date: str) -> str:
 
     print(f'[Notion] 새 페이지 생성: "{title}"')
     page = _req('pages', 'POST', {
-        'parent': {'database_id': REPORT_DB_ID},
+        'parent': {'database_id': db_id},
         'icon': {'type': 'emoji', 'emoji': '📊'},
         'properties': {
             '리포트 명': {'title': [{'text': {'content': title}}]},

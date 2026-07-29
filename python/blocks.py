@@ -119,13 +119,13 @@ def toggle_heading2(text: str, children: list[dict]) -> dict:
 
 # ── 재활 섹션 빌더 ──────────────────────────────────────────────
 
-def build_rehab_section(rehab_items: list[dict], rehab_summary: dict) -> list[dict]:
+def build_rehab_section(rehab_items: list[dict], rehab_summary: dict, period_label: str = '이번 주') -> list[dict]:
     blocks: list[dict] = []
     blocks.append(heading1('🏥 재활 기록'))
 
     total = rehab_summary.get('total', 0)
     if total == 0:
-        blocks.append(paragraph([rt('이번 주 재활 기록 없음.', color='gray')]))
+        blocks.append(paragraph([rt(f'{period_label} 재활 기록 없음.', color='gray')]))
         return blocks
 
     avg_pain = rehab_summary.get('avg_pain')
@@ -169,7 +169,8 @@ def build_rehab_section(rehab_items: list[dict], rehab_summary: dict) -> list[di
 # ── 일기 섹션 빌더 ──────────────────────────────────────────────
 
 def build_diary_section(
-    diary_items: list[dict], diary_summary: dict, generated: dict | None = None
+    diary_items: list[dict], diary_summary: dict, generated: dict | None = None,
+    period_label: str = '이번 주',
 ) -> list[dict]:
     blocks: list[dict] = []
     blocks.append(heading1('📔 일기'))
@@ -188,13 +189,14 @@ def build_diary_section(
                 if mood:
                     text = f'{text} 기분: {mood}'
                 blocks.append(paragraph([rt(f'{label} — ', bold=True), rt(text)]))
-            if generated.get('weekly_summary'):
+            period_summary = generated.get('weekly_summary') or generated.get('monthly_summary')
+            if period_summary:
                 blocks.append(callout(
-                    [rt('이번 주 총평\n', bold=True), rt(generated['weekly_summary'])],
+                    [rt(f'{period_label} 총평\n', bold=True), rt(period_summary)],
                     '💬', 'gray_background',
                 ))
         else:
-            blocks.append(paragraph([rt('이번 주 일기 기록 없음.', color='gray')]))
+            blocks.append(paragraph([rt(f'{period_label} 일기 기록 없음.', color='gray')]))
         return blocks
 
     summary_rows = [['작성 일수', f'{total}일']]
