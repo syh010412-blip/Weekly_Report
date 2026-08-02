@@ -106,6 +106,14 @@ def table(headers: list[str], rows: list[list[str]]) -> dict:
     }
 
 
+def table_chunked(headers: list[str], rows: list[list[str]], max_rows: int = 99) -> list[dict]:
+    """Notion 테이블 블록은 한 번에 최대 100개의 자식(헤더 행 포함)만 생성할 수 있으므로,
+    행이 많으면 여러 개의 테이블 블록으로 나눠 반환한다."""
+    if not rows:
+        return [table(headers, rows)]
+    return [table(headers, rows[i:i + max_rows]) for i in range(0, len(rows), max_rows)]
+
+
 def toggle_heading2(text: str, children: list[dict]) -> dict:
     return {
         'object': 'block', 'type': 'heading_2',
@@ -330,7 +338,7 @@ def build_report_blocks(
             ]
             for item in inbox_items
         ]
-        inbox_children.append(table(['날짜', '시간', '제목', '메모', '처리', '출처'], item_rows))
+        inbox_children.extend(table_chunked(['날짜', '시간', '제목', '메모', '처리', '출처'], item_rows))
     else:
         inbox_children.append(paragraph('이번 주 Inbox 항목 없음'))
     blocks.append(toggle_heading2(f'📋 Inbox 전체 목록 ({inbox_total}건)', inbox_children))

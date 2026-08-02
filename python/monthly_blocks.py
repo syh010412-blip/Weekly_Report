@@ -3,7 +3,7 @@ from datetime import date
 
 from blocks import (
     rt, divider, heading1, heading2, heading3, callout, bullet, numbered,
-    paragraph, table, toggle_heading2, build_rehab_section, build_diary_section,
+    paragraph, table, table_chunked, toggle_heading2, build_rehab_section, build_diary_section,
 )
 from config import DAY_NAMES
 
@@ -131,7 +131,7 @@ def build_monthly_report_blocks(
             ]
             for item in inbox_items
         ]
-        inbox_children.append(table(['날짜', '시간', '제목', '메모', '처리', '출처'], item_rows))
+        inbox_children.extend(table_chunked(['날짜', '시간', '제목', '메모', '처리', '출처'], item_rows))
     else:
         inbox_children.append(paragraph('이번 달 Inbox 항목 없음'))
     blocks.append(toggle_heading2(f'📋 Inbox 전체 목록 ({inbox_total}건)', inbox_children))
