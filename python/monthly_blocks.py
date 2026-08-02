@@ -138,10 +138,11 @@ def build_monthly_report_blocks(
 
     blocks.append(divider())
 
-    # ── 구글 캘린더 일정 (주차별 토글) ────────────────────────────
-    blocks.append(heading1('📆 이번 달 구글 캘린더 일정'))
+    # ── 구글 캘린더 일정 (주차별 토글, 각 주를 최상위 블록으로 분리) ──
+    # 한 달치 이벤트를 토글 하나에 몰아넣으면 Notion API 요청 크기 제한(413)에
+    # 걸리므로, 주 단위로 최상위 토글을 나눠 블록 하나의 크기를 억제한다.
+    blocks.append(heading1(f'📆 이번 달 구글 캘린더 일정 ({cal_total}건)'))
 
-    cal_week_children: list[dict] = []
     for w in weekly_breakdown:
         week_children: list[dict] = []
         for d in w['dates']:
@@ -156,8 +157,7 @@ def build_monthly_report_blocks(
                 week_children.append(table(['시간', '이벤트', '캘린더'], day_rows))
             else:
                 week_children.append(bullet(f'{day_name} {d} — 일정 없음'))
-        cal_week_children.append(toggle_heading2(f'{w["monday"]} 주 ({w["cal_count"]}건)', week_children))
-    blocks.append(toggle_heading2(f'📅 주차별 캘린더 ({cal_total}건)', cal_week_children))
+        blocks.append(toggle_heading2(f'{w["monday"]} 주 ({w["cal_count"]}건)', week_children))
 
     blocks.append(divider())
 
