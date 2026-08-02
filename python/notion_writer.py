@@ -1,9 +1,15 @@
 """AI 주간 리포트 DB에 분석 결과 페이지를 생성/업데이트하는 모듈."""
+import json
+
 import requests
 
 from config import NOTION_API_KEY, REPORT_DB_ID
 
 CHUNK_SIZE = 100
+# Notion blocks.children.append 요청 본문 크기 제한(약 500KB)보다 여유 있게 설정.
+# 월간 리포트처럼 한 블록에 데이터가 많이 중첩되는 경우를 대비해 블록 개수뿐 아니라
+# 바이트 크기 기준으로도 청크를 나눈다.
+MAX_CHUNK_BYTES = 400_000
 _HEADERS = {
     'Authorization': f'Bearer {NOTION_API_KEY}',
     'Notion-Version': '2022-06-28',
@@ -50,12 +56,27 @@ def _clear_blocks(page_id: str) -> None:
             break
 
 
+def _block_size(block: dict) -> int:
+    return len(json.dumps(block, ensure_ascii=False).encode('utf-8'))
+
+
 def _append_blocks(page_id: str, blocks: list[dict]) -> None:
-    for i in range(0, len(blocks), CHUNK_SIZE):
-        chunk = blocks[i:i + CHUNK_SIZE]
+    n = len(blocks)
+    i = 0
+    done = 0
+    while i < n:
+        chunk: list[dict] = []
+        chunk_bytes = 0
+        while i < n and len(chunk) < CHUNK_SIZE:
+            block_bytes = _block_size(blocks[i])
+            if chunk and chunk_bytes + block_bytes > MAX_CHUNK_BYTES:
+                break
+            chunk.append(blocks[i])
+            chunk_bytes += block_bytes
+            i += 1
         _req(f'blocks/{page_id}/children', 'PATCH', {'children': chunk})
-        done = min(i + CHUNK_SIZE, len(blocks))
-        print(f'[Notion] 블록 업로드: {done}/{len(blocks)}')
+        done += len(chunk)
+        print(f'[Notion] 블록 업로드: {done}/{n}')
 
 
 def upsert_report(title: str, blocks: list[dict], analysis_date: str, db_id: str = REPORT_DB_ID) -> str:
