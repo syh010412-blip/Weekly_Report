@@ -127,7 +127,10 @@ def toggle_heading2(text: str, children: list[dict]) -> dict:
 
 # ── 재활 섹션 빌더 ──────────────────────────────────────────────
 
-def build_rehab_section(rehab_items: list[dict], rehab_summary: dict, period_label: str = '이번 주') -> list[dict]:
+def build_rehab_section(
+    rehab_items: list[dict], rehab_summary: dict, period_label: str = '이번 주',
+    rehab_analysis: dict | None = None,
+) -> list[dict]:
     blocks: list[dict] = []
     blocks.append(heading1('🏥 재활 기록'))
 
@@ -154,6 +157,19 @@ def build_rehab_section(rehab_items: list[dict], rehab_summary: dict, period_lab
 
     blocks.append(table(['항목', '내용'], summary_rows))
 
+    if rehab_analysis:
+        blocks.append(heading3(f'🔍 {period_label} 재활 분석'))
+        blocks.append(table(
+            ['분석 항목', '내용'],
+            [
+                ['통증 추이', rehab_analysis.get('pain_trend', '-')],
+                ['왼팔 움직임 추이', rehab_analysis.get('mobility_trend', '-')],
+                ['특이사항 / 패턴', rehab_analysis.get('notable_pattern', '-')],
+                ['종합 평가', rehab_analysis.get('overall_assessment', '-')],
+                ['제안', rehab_analysis.get('suggestion', '-')],
+            ],
+        ))
+
     detail_rows = [
         [
             item['date'],
@@ -178,7 +194,7 @@ def build_rehab_section(rehab_items: list[dict], rehab_summary: dict, period_lab
 
 def build_diary_section(
     diary_items: list[dict], diary_summary: dict, generated: dict | None = None,
-    period_label: str = '이번 주',
+    period_label: str = '이번 주', diary_analysis: dict | None = None,
 ) -> list[dict]:
     blocks: list[dict] = []
     blocks.append(heading1('📔 일기'))
@@ -213,6 +229,18 @@ def build_diary_section(
         summary_rows.append(['기분/태그 분포', ' / '.join(f'{k} {v}일' for k, v in mood_counts.items())])
     blocks.append(table(['항목', '내용'], summary_rows))
 
+    if diary_analysis:
+        blocks.append(heading3(f'🔍 {period_label} 일기 분석'))
+        key_events = diary_analysis.get('key_events') or []
+        blocks.append(table(
+            ['분석 항목', '내용'],
+            [
+                ['감정 흐름', diary_analysis.get('emotion_flow', '-')],
+                ['주요 사건', ' / '.join(key_events) if key_events else '-'],
+                ['총평', diary_analysis.get('overall_reflection', '-')],
+            ],
+        ))
+
     diary_children: list[dict] = []
     for item in diary_items:
         title = item['title'] or '(제목 없음)'
@@ -240,6 +268,8 @@ def build_report_blocks(
     diary_items: list[dict] | None = None,
     diary_summary: dict | None = None,
     generated_diary: dict | None = None,
+    rehab_analysis: dict | None = None,
+    diary_analysis: dict | None = None,
 ) -> list[dict]:
     monday, sunday = week['monday'], week['sunday']
     blocks: list[dict] = []
@@ -401,12 +431,12 @@ def build_report_blocks(
 
     # ── 재활 기록 ─────────────────────────────────────────────────
     if rehab_items is not None and rehab_summary is not None:
-        blocks.extend(build_rehab_section(rehab_items, rehab_summary))
+        blocks.extend(build_rehab_section(rehab_items, rehab_summary, rehab_analysis=rehab_analysis))
         blocks.append(divider())
 
     # ── 일기 ─────────────────────────────────────────────────────
     if diary_items is not None and diary_summary is not None:
-        blocks.extend(build_diary_section(diary_items, diary_summary, generated_diary))
+        blocks.extend(build_diary_section(diary_items, diary_summary, generated_diary, diary_analysis=diary_analysis))
         blocks.append(divider())
 
     blocks.append(callout('Claude AI가 분석한 주간 리포트입니다.', '🤖', 'gray_background'))
