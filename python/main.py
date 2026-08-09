@@ -100,12 +100,31 @@ def main() -> None:
         except Exception as err:
             log(f'[경고] 일기 자동 생성 실패 (계속 진행): {err}')
 
+    # 4.6. 재활 기록 추이/패턴 분석
+    rehab_analysis = None
+    if rehab_items:
+        try:
+            from analyzer import analyze_rehab
+            rehab_analysis = analyze_rehab(rehab_items, rehab_summary)
+        except Exception as err:
+            log(f'[경고] 재활 분석 실패 (계속 진행): {err}')
+
+    # 4.7. 실제 일기 기록이 있으면 감정 흐름/주요 사건 분석
+    diary_analysis = None
+    if diary_summary['total'] > 0:
+        try:
+            from analyzer import analyze_diary_entries
+            diary_analysis = analyze_diary_entries(diary_items)
+        except Exception as err:
+            log(f'[경고] 일기 분석 실패 (계속 진행): {err}')
+
     # 5. Notion 블록 생성
     log('Notion 블록 빌드 중...')
     from blocks import build_report_blocks
     blocks = build_report_blocks(
         week, cal_by_date, inbox_items, inbox_summary, analysis,
         rehab_items, rehab_summary, diary_items, diary_summary, generated_diary,
+        rehab_analysis, diary_analysis,
     )
     log(f'블록 {len(blocks)}개 생성')
 

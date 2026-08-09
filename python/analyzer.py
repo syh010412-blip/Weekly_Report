@@ -322,3 +322,135 @@ def generate_diary_reflection(
     result = _extract_tool_input(message, DIARY_TOOL['name'])
     print('[일기 생성] 완료')
     return result
+
+
+REHAB_ANALYSIS_SYSTEM_PROMPT = """당신은 재활 전문 코치입니다.
+주어진 재활 기록 데이터만을 근거로 통증·움직임 추이와 패턴을 분석합니다.
+데이터에 없는 사실을 지어내지 마세요. 한국어로, 간결하고 구체적으로 작성하세요.
+"""
+
+
+def _build_rehab_analysis_prompt(rehab_items: list[dict], rehab_summary: dict) -> str:
+    lines = []
+    for item in rehab_items:
+        lines.append(
+            f'  {item["date"]} | 컨디션: {item["condition"] or "-"} | 통증: {item["pain"]}/10 | '
+            f'왼팔: {item["arm_mobility"]}/10 | 기분: {item["mood"] or "-"} | '
+            f'운동: {item["exercises"] or "-"} | 메모: {item["memo"] or "-"}'
+        )
+    detail_section = '\n'.join(lines)
+
+    return f"""아래 재활 기록을 날짜 순서로 분석하세요.
+
+## 재활 기록 ({rehab_summary.get('total', 0)}건)
+{detail_section}
+
+## 요약 수치
+- 평균 통증: {rehab_summary.get('avg_pain')}
+- 평균 왼팔 움직임: {rehab_summary.get('avg_arm_mobility')}
+
+## 분석 지침
+- 통증 수준과 왼팔 움직임이 기간 동안 어떻게 변했는지(호전/악화/유지) 구체적 수치와 함께 서술하세요.
+- 특이사항이나 반복되는 패턴(예: 특정 요일에 통증 증가, 특정 운동 후 호전 등)을 찾으세요.
+- 데이터에 없는 원인이나 사실을 추측해서 지어내지 마세요.
+"""
+
+
+REHAB_ANALYSIS_TOOL = {
+    'name': 'submit_rehab_analysis',
+    'description': '재활 기록 분석 결과를 제출합니다.',
+    'input_schema': {
+        'type': 'object',
+        'properties': {
+            'pain_trend': {'type': 'string', 'description': '통증 추이 (1~2문장)'},
+            'mobility_trend': {'type': 'string', 'description': '왼팔 움직임 추이 (1~2문장)'},
+            'notable_pattern': {'type': 'string', 'description': '특이사항·반복 패턴 (1~2문장)'},
+            'overall_assessment': {'type': 'string', 'description': '종합 평가 (1~2문장)'},
+            'suggestion': {'type': 'string', 'description': '다음 재활 관련 제안 (1문장)'},
+        },
+        'required': ['pain_trend', 'mobility_trend', 'notable_pattern', 'overall_assessment', 'suggestion'],
+    },
+}
+
+
+def analyze_rehab(rehab_items: list[dict], rehab_summary: dict) -> dict | None:
+    """재활 기록 데이터를 분석해 추이·패턴 요약을 생성."""
+    if not rehab_items:
+        return None
+
+    print('[재활 분석] 통증/움직임 추이 분석 중...')
+    prompt = _build_rehab_analysis_prompt(rehab_items, rehab_summary)
+
+    message = client.messages.create(
+        model='claude-sonnet-4-6',
+        max_tokens=1500,
+        system=REHAB_ANALYSIS_SYSTEM_PROMPT,
+        messages=[{'role': 'user', 'content': prompt}],
+        tools=[REHAB_ANALYSIS_TOOL],
+        tool_choice={'type': 'tool', 'name': REHAB_ANALYSIS_TOOL['name']},
+    )
+
+    result = _extract_tool_input(message, REHAB_ANALYSIS_TOOL['name'])
+    print('[재활 분석] 완료')
+    return result
+
+
+DIARY_ANALYSIS_SYSTEM_PROMPT = """당신은 다정한 회고 코치입니다.
+사용자가 실제로 쓴 일기 원문만을 근거로 감정 흐름과 주요 사건을 분석합니다.
+일기에 없는 사실이나 감정을 지어내지 마세요. 한국어로 작성하세요.
+"""
+
+
+def _build_diary_analysis_prompt(diary_items: list[dict]) -> str:
+    entry_lines = []
+    for item in diary_items:
+        content = item.get('content') or '(본문 없음)'
+        entry_lines.append(f'### {item["date"]}\n{content}')
+    entries_section = '\n\n'.join(entry_lines)
+
+    return f"""아래는 이번 기간에 실제로 작성된 일기 원문입니다.
+
+{entries_section}
+
+## 분석 지침
+- 한 주(기간) 동안의 감정 흐름을 시간 순서로 2~3문장으로 요약하세요.
+- 일기에 등장하는 주요 사건을 짧은 항목 리스트로 뽑으세요 (일기에 없는 사건을 지어내지 마세요).
+- 마지막에 전체 총평을 1~2문장으로 작성하세요.
+"""
+
+
+DIARY_ANALYSIS_TOOL = {
+    'name': 'submit_diary_analysis',
+    'description': '일기 원문에 대한 감정/사건 분석 결과를 제출합니다.',
+    'input_schema': {
+        'type': 'object',
+        'properties': {
+            'emotion_flow': {'type': 'string', 'description': '기간 동안의 감정 흐름 (2~3문장)'},
+            'key_events': {'type': 'array', 'items': {'type': 'string'}, 'description': '주요 사건 목록'},
+            'overall_reflection': {'type': 'string', 'description': '총평 (1~2문장)'},
+        },
+        'required': ['emotion_flow', 'key_events', 'overall_reflection'],
+    },
+}
+
+
+def analyze_diary_entries(diary_items: list[dict]) -> dict | None:
+    """실제 일기 기록이 있을 때, 감정 흐름·주요 사건 분석을 생성."""
+    if not diary_items or not any(item.get('content') for item in diary_items):
+        return None
+
+    print('[일기 분석] 감정 흐름/주요 사건 분석 중...')
+    prompt = _build_diary_analysis_prompt(diary_items)
+
+    message = client.messages.create(
+        model='claude-sonnet-4-6',
+        max_tokens=1500,
+        system=DIARY_ANALYSIS_SYSTEM_PROMPT,
+        messages=[{'role': 'user', 'content': prompt}],
+        tools=[DIARY_ANALYSIS_TOOL],
+        tool_choice={'type': 'tool', 'name': DIARY_ANALYSIS_TOOL['name']},
+    )
+
+    result = _extract_tool_input(message, DIARY_ANALYSIS_TOOL['name'])
+    print('[일기 분석] 완료')
+    return result
