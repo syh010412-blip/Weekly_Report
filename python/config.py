@@ -52,6 +52,14 @@ def get_month_range(today_str: str) -> dict:
     return {'year': year, 'month': month, 'start': str(start), 'end': str(end), 'dates': dates}
 
 
+def get_previous_month_range(today_str: str) -> dict:
+    """해당 날짜 기준 '지난달'의 시작일~종료일 계산. 매월 1일에 실행되는 자동
+    월간 리포트는 이제 막 시작한 이번 달이 아니라 방금 끝난 지난달을 다뤄야 하므로 사용."""
+    today = date.fromisoformat(today_str)
+    last_day_of_prev_month = today.replace(day=1) - timedelta(days=1)
+    return get_month_range(str(last_day_of_prev_month))
+
+
 def group_dates_by_week(dates: list[str]) -> list[dict]:
     """날짜 목록을 (월요일 시작) 주 단위로 묶는다. 월 경계에 걸친 주는 해당 월에 속한 날짜만 포함한다."""
     buckets: dict[date, list[str]] = {}
