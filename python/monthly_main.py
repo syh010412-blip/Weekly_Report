@@ -1,14 +1,18 @@
 """월간 리포트 메인 실행 파일.
 
 실행 방법:
-  python monthly_main.py                        # 이번 달 (KST 기준 오늘)
-  REPORT_DATE=2026-05-06 python monthly_main.py  # 특정 날짜가 속한 달
+  python monthly_main.py                        # 지난달 (KST 기준 오늘이 속한 달의 전월)
+  REPORT_DATE=2026-05-06 python monthly_main.py  # 특정 날짜가 속한 달을 명시적으로 지정
+
+REPORT_DATE를 지정하지 않으면 '지난달' 리포트를 만든다. 매월 1일에 자동 실행되는
+스케줄은 이제 막 시작한 이번 달이 아니라 방금 끝난 지난달을 다뤄야 하기 때문이다.
+특정 달을 다시 만들고 싶을 때는 REPORT_DATE로 그 달에 속하는 날짜를 명시하면 된다.
 """
 import os
 import sys
 from datetime import datetime
 
-from config import get_kst_today, get_month_range, group_dates_by_week, MONTHLY_REPORT_DB_ID
+from config import get_kst_today, get_month_range, get_previous_month_range, group_dates_by_week, MONTHLY_REPORT_DB_ID
 
 
 def log(msg: str) -> None:
@@ -24,8 +28,9 @@ def main() -> None:
     log('=== 월간 리포트 생성 시작 ===')
 
     # 1. 날짜 범위 결정
-    today = os.getenv('REPORT_DATE') or get_kst_today()
-    month = get_month_range(today)
+    explicit_date = os.getenv('REPORT_DATE')
+    today = get_kst_today()
+    month = get_month_range(explicit_date) if explicit_date else get_previous_month_range(today)
     log(f'분석 기간: {month["start"]} ~ {month["end"]} ({month["year"]}년 {month["month"]}월)')
     weeks = group_dates_by_week(month['dates'])
 
