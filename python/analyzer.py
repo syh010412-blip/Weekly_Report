@@ -195,6 +195,21 @@ def _extract_tool_input(message, tool_name: str) -> dict:
     raise ValueError(f'[{tool_name}] 응답에 tool_use 블록이 없습니다: {message.content}')
 
 
+def _coerce_field(value, kind: str, default):
+    """tool-use는 스키마를 강하게 유도하지만 100% 보장하진 않아서, 드물게
+    object/array 필드가 JSON 문자열로 오는 경우가 있다. 그런 경우를 보정한다."""
+    if isinstance(value, str):
+        try:
+            value = json.loads(value)
+        except (json.JSONDecodeError, TypeError):
+            return default
+    if kind == 'object' and not isinstance(value, dict):
+        return default
+    if kind == 'array' and not isinstance(value, list):
+        return default
+    return value
+
+
 def analyze(week: dict, cal_by_date: dict, inbox_items: list[dict], inbox_summary: dict) -> dict:
     print('[AI 분석] Claude에 분석 요청 중...')
     prompt = _build_prompt(week, cal_by_date, inbox_items, inbox_summary)
@@ -211,6 +226,17 @@ def analyze(week: dict, cal_by_date: dict, inbox_items: list[dict], inbox_summar
     )
 
     result = _extract_tool_input(message, ANALYSIS_TOOL['name'])
+    pve = _coerce_field(
+        result.get('plan_vs_execution'), 'object',
+        {'executed_as_planned': [], 'unplanned_captures': [], 'planned_not_captured': []},
+    )
+    for key in ('executed_as_planned', 'unplanned_captures', 'planned_not_captured'):
+        pve[key] = _coerce_field(pve.get(key), 'array', [])
+    result['plan_vs_execution'] = pve
+    result['metrics'] = _coerce_field(result.get('metrics'), 'object', {})
+    result['insights'] = _coerce_field(result.get('insights'), 'array', [])
+    result['patterns'] = _coerce_field(result.get('patterns'), 'object', {})
+    result['next_week_suggestions'] = _coerce_field(result.get('next_week_suggestions'), 'array', [])
     print('[AI 분석] 완료')
     return result
 
@@ -320,6 +346,7 @@ def generate_diary_reflection(
     )
 
     result = _extract_tool_input(message, DIARY_TOOL['name'])
+    result['entries'] = _coerce_field(result.get('entries'), 'array', [])
     print('[일기 생성] 완료')
     return result
 
@@ -452,5 +479,6 @@ def analyze_diary_entries(diary_items: list[dict]) -> dict | None:
     )
 
     result = _extract_tool_input(message, DIARY_ANALYSIS_TOOL['name'])
+    result['key_events'] = _coerce_field(result.get('key_events'), 'array', [])
     print('[일기 분석] 완료')
     return result
